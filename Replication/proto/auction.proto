@@ -10,10 +10,12 @@ service AuctionService {
 
     // Get the result of the auction
     rpc Result (ResultRequest) returns (ResultResponse);
+
+    rpc RegisterBidder (BidderRequest) returns (BidderResponse);
 }
 
 message BidRequest {
-    string bidder = 1; // Name of the bidder
+    int32 bidder = 1; // Name of the bidder
     int32 amount = 2;  // Bid amount
 }
 
@@ -25,4 +27,12 @@ message ResultRequest {}
 
 message ResultResponse {
     string result = 1; // Highest bid or Winner
+}
+
+message BidderRequest {
+    string address = 1;
+}
+
+message BidderResponse {
+    string status = 1; 
 }
