@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+
 	"auction/proto/proto"
 	auction "auction/proto/proto"
 
@@ -33,13 +34,12 @@ func NewAuctionServer(id int64) *AuctionServer {
 	return &AuctionServer{
 		highestBid:     0,
 		highestBidder:  0,
-		auctionEndTime: time.Now().Add(20 * time.Second),
+		auctionEndTime: time.Now().Add(30 * time.Second),
 		NodeID:         id,
 	}
 }
 
 func (s *AuctionServer) Bid(ctx context.Context, req *auction.BidRequest) (*auction.BidResponse, error) {
-
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -81,9 +81,7 @@ func (s *AuctionServer) Result(ctx context.Context, req *auction.ResultRequest) 
 }
 
 func (s *AuctionServer) syncState() {
-
 	for _, bidder := range s.bidders {
-
 		bidder.Bid(context.Background(), &auction.BidRequest{
 			Bidder: int32(s.highestBidder),
 			Amount: int32(s.highestBid),
@@ -96,9 +94,7 @@ func (s *AuctionServer) syncState() {
 }
 
 func (n *AuctionServer) getClient(server string) (proto.AuctionServiceClient, error) {
-	fmt.Println(server)
-
-	conn, err := grpc.NewClient(server, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := grpc.Dial(server, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return nil, err
 	}
@@ -107,22 +103,22 @@ func (n *AuctionServer) getClient(server string) (proto.AuctionServiceClient, er
 }
 
 func (s *AuctionServer) RegisterBidder(ctx context.Context, req *auction.BidderRequest) (*auction.BidderResponse, error) {
-
 	if !s.isPrimary {
 		return &auction.BidderResponse{Status: "Fail: not primary"}, nil
 	}
 
 	bidder, err := s.getClient(req.Address)
 	if err != nil {
-		log.Fatalf("Error")
+		log.Fatalf("Error registering bidder: %v", err)
 	}
 
 	s.bidders = append(s.bidders, bidder)
 	for _, backup := range s.backupNodes {
 		backup.bidders = append(backup.bidders, bidder)
 	}
+
 	log.Printf("Bidder registered: %s", req.Address)
-	return &auction.BidderResponse{Status: "succes"}, nil
+	return &auction.BidderResponse{Status: "success"}, nil
 }
 
 func (s *AuctionServer) Start(address string) {
@@ -139,39 +135,27 @@ func (s *AuctionServer) Start(address string) {
 }
 
 func main() {
-
 	port := flag.Int64("port", 50051, "Port for the gRPC server to listen on")
 	flag.Parse()
 	server := NewAuctionServer(*port)
 
 	if *port == int64(50051) {
-
 		server.isPrimary = true
 		backup := NewAuctionServer(50052)
-		/*
-			backupclient, err := backup.getClient("localhost:50052")
-			if err != nil {
-				log.Fatalf("Error")
-			}
-		*/
 		server.backupNodes = append(server.backupNodes, *backup)
-
 	}
 
 	go server.Start(fmt.Sprintf(":%d", server.NodeID))
 
-	if !server.isPrimary {
+	
 
+	if !server.isPrimary {
 		primary, err := server.getClient("localhost:50051")
 		if err != nil {
-			log.Fatalf("Error")
+			log.Fatalf("Error connecting to primary: %v", err)
 		}
-		/*
-			backupClient, err := server.getClient("localhost:50052")
-			if err != nil {
-				log.Fatalf("Error")
-			}
-		*/
+
+		//First bid
 		req := &auction.BidRequest{
 			Bidder: int32(*port),
 			Amount: 500,
@@ -186,13 +170,43 @@ func main() {
 		primary.Bid(context.Background(), req)
 
 		time.Sleep(3 * time.Second)
+
+		//Result from bid
 		resReq := &auction.ResultRequest{}
 		resp, err := (server.Result(context.Background(), resReq))
 		if err != nil {
-			log.Fatalf("Error")
+			log.Fatalf("Error getting result: %v", err)
 		}
 		log.Printf(resp.Result)
 
+		time.Sleep(10 * time.Second)
+
+		//Query auction before it is over
+		resp, err = (server.Result(context.Background(), resReq))
+		if err != nil {
+			log.Fatalf("Error getting result: %v", err)
+		}
+		fmt.Println()
+		log.Printf("%d Querying the auction: %s", *port, resp.Result)
+
+		//Bidding higher than first bid
+		if *port != 50053 && *port != 50054 {
+			req = &auction.BidRequest{
+				Bidder: int32(*port),
+				Amount: 650,
+			}
+			primary.Bid(context.Background(), req)
+		}
+
+		time.Sleep(35 * time.Second)
+
+		//Query auction after it is over
+		resp, err = (server.Result(context.Background(), resReq))
+		if err != nil {
+			log.Fatalf("Error getting result: %v", err)
+		}
+		fmt.Println()
+		log.Printf("%d Querying the auction: %s", *port, resp.Result)
 	}
 
 	if server.isPrimary {
@@ -202,13 +216,13 @@ func main() {
 				resReq := &auction.ResultRequest{}
 				resp, err := (server.Result(context.Background(), resReq))
 				if err != nil {
-					log.Fatalf("Error")
+					log.Fatalf("Error getting result: %v", err)
 				}
 				log.Printf(resp.Result)
 				break
 			}
-
 		}
 	}
+
 	select {}
 }
