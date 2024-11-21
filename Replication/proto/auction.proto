@@ -15,18 +15,18 @@ service AuctionService {
 }
 
 message BidRequest {
-    int32 bidder = 1; // Name of the bidder
-    int32 amount = 2;  // Bid amount
+    int32 bidder = 1; 
+    int32 amount = 2;  
 }
 
 message BidResponse {
-    string status = 1; // success, fail, exception
+    string status = 1; 
 }
 
 message ResultRequest {}
 
 message ResultResponse {
-    string result = 1; // Highest bid or Winner
+    string result = 1; 
 }
 
 message BidderRequest {
