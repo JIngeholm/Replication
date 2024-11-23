@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.5.1
 // - protoc             v5.28.3
-// source: proto/auction.proto
+// source: auction.proto
 
 package proto
 
@@ -23,6 +23,7 @@ const (
 	AuctionService_Result_FullMethodName         = "/auction.AuctionService/Result"
 	AuctionService_RegisterBidder_FullMethodName = "/auction.AuctionService/RegisterBidder"
 	AuctionService_SyncState_FullMethodName      = "/auction.AuctionService/SyncState"
+	AuctionService_SendHeartbeat_FullMethodName  = "/auction.AuctionService/SendHeartbeat"
 )
 
 // AuctionServiceClient is the client API for AuctionService service.
@@ -37,6 +38,8 @@ type AuctionServiceClient interface {
 	RegisterBidder(ctx context.Context, in *BidderRequest, opts ...grpc.CallOption) (*BidderResponse, error)
 	// Sync auction state across nodes
 	SyncState(ctx context.Context, in *SyncStateRequest, opts ...grpc.CallOption) (*SyncStateResponse, error)
+	// Send a heartbeat to check node health
+	SendHeartbeat(ctx context.Context, in *HeartbeatRequest, opts ...grpc.CallOption) (*HeartbeatResponse, error)
 }
 
 type auctionServiceClient struct {
@@ -87,6 +90,16 @@ func (c *auctionServiceClient) SyncState(ctx context.Context, in *SyncStateReque
 	return out, nil
 }
 
+func (c *auctionServiceClient) SendHeartbeat(ctx context.Context, in *HeartbeatRequest, opts ...grpc.CallOption) (*HeartbeatResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(HeartbeatResponse)
+	err := c.cc.Invoke(ctx, AuctionService_SendHeartbeat_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // AuctionServiceServer is the server API for AuctionService service.
 // All implementations must embed UnimplementedAuctionServiceServer
 // for forward compatibility.
@@ -99,6 +112,8 @@ type AuctionServiceServer interface {
 	RegisterBidder(context.Context, *BidderRequest) (*BidderResponse, error)
 	// Sync auction state across nodes
 	SyncState(context.Context, *SyncStateRequest) (*SyncStateResponse, error)
+	// Send a heartbeat to check node health
+	SendHeartbeat(context.Context, *HeartbeatRequest) (*HeartbeatResponse, error)
 	mustEmbedUnimplementedAuctionServiceServer()
 }
 
@@ -120,6 +135,9 @@ func (UnimplementedAuctionServiceServer) RegisterBidder(context.Context, *Bidder
 }
 func (UnimplementedAuctionServiceServer) SyncState(context.Context, *SyncStateRequest) (*SyncStateResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SyncState not implemented")
+}
+func (UnimplementedAuctionServiceServer) SendHeartbeat(context.Context, *HeartbeatRequest) (*HeartbeatResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SendHeartbeat not implemented")
 }
 func (UnimplementedAuctionServiceServer) mustEmbedUnimplementedAuctionServiceServer() {}
 func (UnimplementedAuctionServiceServer) testEmbeddedByValue()                        {}
@@ -214,6 +232,24 @@ func _AuctionService_SyncState_Handler(srv interface{}, ctx context.Context, dec
 	return interceptor(ctx, in, info, handler)
 }
 
+func _AuctionService_SendHeartbeat_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(HeartbeatRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuctionServiceServer).SendHeartbeat(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuctionService_SendHeartbeat_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuctionServiceServer).SendHeartbeat(ctx, req.(*HeartbeatRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // AuctionService_ServiceDesc is the grpc.ServiceDesc for AuctionService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -237,7 +273,11 @@ var AuctionService_ServiceDesc = grpc.ServiceDesc{
 			MethodName: "SyncState",
 			Handler:    _AuctionService_SyncState_Handler,
 		},
+		{
+			MethodName: "SendHeartbeat",
+			Handler:    _AuctionService_SendHeartbeat_Handler,
+		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "proto/auction.proto",
+	Metadata: "auction.proto",
 }

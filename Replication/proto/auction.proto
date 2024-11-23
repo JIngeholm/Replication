@@ -16,6 +16,9 @@ service AuctionService {
 
     // Sync auction state across nodes
     rpc SyncState (SyncStateRequest) returns (SyncStateResponse);
+
+    // Send a heartbeat to check node health
+    rpc SendHeartbeat (HeartbeatRequest) returns (HeartbeatResponse);
 }
 
 message BidRequest {
@@ -47,5 +50,11 @@ message SyncStateRequest {
 }
 
 message SyncStateResponse {
+    string status = 1;
+}
+
+message HeartbeatRequest {}
+
+message HeartbeatResponse {
     string status = 1;
 }
